@@ -84,30 +84,21 @@ chainr p1 p o = p1 >>= rest
             <|> pure l
 
 -- >>> testParser expr "e1"
--- >>> testParser expr "e1 | e2"
--- >>> testParser expr "e1 | e2 | e3"
 -- >>> testParser expr "e1 | e2 & e3"
 -- >>> testParser expr "e1 & e2 | e3"
--- >>> testParser expr "e1 -> e2"
 -- >>> testParser expr "e1 -> e2 & e3"
--- >>> testParser expr "e1 | e2 -> e3"
 -- >>> testParser expr "e1 | e2 -> e3 & e4"
 -- >>> testParser expr "e1 -> e2 -> e3"
 -- Right (Ident "e1")
--- Right (Or (Ident "e1") (Ident "e2"))
--- Right (Or (Or (Ident "e1") (Ident "e2")) (Ident "e3"))
 -- Right (And (Or (Ident "e1") (Ident "e2")) (Ident "e3"))
--- Right (And (Ident "e1") (Or (Ident "e2") (Ident "e3")))
--- Right (Implies (Ident "e1") (Ident "e2"))
+-- Right (Or (And (Ident "e1") (Ident "e2")) (Ident "e3"))
 -- Right (Implies (Ident "e1") (And (Ident "e2") (Ident "e3")))
--- Right (Or (Ident "e1") (Implies (Ident "e2") (Ident "e3")))
 -- Right (Or (Ident "e1") (Implies (Ident "e2") (And (Ident "e3") (Ident "e4"))))
 -- Right (Implies (Ident "e1") (Implies (Ident "e2") (Ident "e3")))
 expr :: Parser Expr
 expr =
-    (chainr exprIdent expr exprImpl)
-        `chainl1` exprOr
-        `chainl1` exprAnd
+    chainr exprIdent expr exprImpl
+        `chainl1` (exprOr <|> exprAnd)
   where
     exprIdent = Ident <$> (space *> name <* space)
     ex s f = string s $> f
