@@ -2,6 +2,6 @@ main = do
     func1 -> func2
     func1 & {lt 2 #4};
 
-func1 = {has 3 #1} | {has 1 #2};
+func1 = {eq 1 #1} | {gt 2 #2};
 
-func2 = ~ {has 3 #3};
+func2 = ~ {lt 2 #3};

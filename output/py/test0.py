@@ -1,6 +1,14 @@
-def main(deck):
-	return((func1(deck) and func2(deck)) and (func1(deck) and lt(2,deck[4])))
-def func1(deck):
-	return(has(3,deck[1]) or has(1,deck[2]))
-def func2(deck):
-	return(not has(3,deck[3]))
+def lt(hand, n, card):
+	return hand.count(card) < n
+def eq(hand, n, card):
+	return hand.count(card) == n
+def gt(hand, n, card):
+	return hand.count(card) > n
+def has(hand, card):
+	return card in hand
+def main(hand):
+	return(((not func1(hand)) or func2(hand)) and (func1(hand) and lt(hand,2,4)))
+def func1(hand):
+	return(eq(hand,1,1) or gt(hand,2,2))
+def func2(hand):
+	return(not lt(hand,2,3))
