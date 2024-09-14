@@ -23,15 +23,16 @@ runLang lang = do
 
     tests <- traverse readYug ["test0", "test1"]
     forM_ tests $ \(f, t) -> do
-        putStrLn ("\n\n" <> f)
+        let dashes = replicate 20 '-'
+        putStrLn $ dashes <> f <> dashes
+
         let deckName = "deck"
             transpile = case lang of
                 "py" -> Py.transpile
                 _ -> error "Unknown Target"
             parseResult = parse statements f t
-            result =
-                case fmap (transpile deckName) <$> parseResult of
-                    Left e -> errorBundlePretty e
-                    Right r -> intercalate "\n" r
-        putStrLn result
-        writeYug f result
+            transpileResult = fmap (transpile deckName) <$> parseResult
+
+        case transpileResult of
+            Left e -> putStrLn $ errorBundlePretty e <> "\n"
+            Right r -> writeYug f $ intercalate "\n" r
