@@ -4,7 +4,6 @@
 module Main (main) where
 
 import Control.Monad
-import Data.Functor
 import Data.List (intercalate)
 import qualified Data.Text.IO as T
 import Predicate.Parser
