@@ -17,6 +17,20 @@ testTranspile inp =
 
 transpile :: String -> Statement -> String
 transpile deckName = \case
+header :: String
+header =
+    intercalate
+        "\n"
+        [ "def lt(hand, n, card):"
+        , "\treturn hand.count(card) < n"
+        , "def eq(hand, n, card):"
+        , "\treturn hand.count(card) == n"
+        , "def gt(hand, n, card):"
+        , "\treturn hand.count(card) > n"
+        , "def has(hand, card):"
+        , "\treturn card in hand"
+        ]
+        <> "\n"
     SetDeck xs ->
         let transpiledDeck = intercalate "," ((\(c, n) -> c <> ":" <> show n) <$> xs)
          in concat [deckName, " = ", "{" <> transpiledDeck <> "}"]
