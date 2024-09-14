@@ -133,7 +133,7 @@ identifier :: Parser Identifier
 identifier =
     MP.letterChar <:> many (MP.alphaNumChar <|> MP.oneOf special)
   where
-    special = "_'" :: String
+    special = "_'." :: String
 
 -- >>> testParser expr "e1"
 -- >>> testParser expr "e1 | e2 & e3"
