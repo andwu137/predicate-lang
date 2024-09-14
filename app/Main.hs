@@ -4,7 +4,6 @@
 module Main (main) where
 
 import Control.Monad
-import Data.List (intercalate)
 import qualified Data.Text.IO as T
 import Predicate.Parser
 import qualified Predicate.Targets.Python as Py
@@ -27,12 +26,13 @@ runLang lang = do
         putStrLn $ dashes <> f <> dashes
 
         let deckName = "deck"
+            handName = "hand"
             transpile = case lang of
                 "py" -> Py.transpile
                 _ -> error "Unknown Target"
             parseResult = parse statements f t
-            transpileResult = fmap (transpile deckName) <$> parseResult
+            transpileResult = transpile deckName handName <$> parseResult
 
         case transpileResult of
             Left e -> putStrLn $ errorBundlePretty e <> "\n"
-            Right r -> writeYug f $ intercalate "\n" r
+            Right r -> writeYug f r
