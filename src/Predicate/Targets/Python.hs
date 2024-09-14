@@ -11,12 +11,10 @@ import Predicate.Parser
 -- "def main(d):\n\treturn (((has(d,3,d[17]) and (not has(d,1,d[2]))) or gt(d,2,d[4])) and lt(d,3,d[1]))"
 testTranspile :: T.Text -> String
 testTranspile inp =
-    case testParser statement inp of
+    case testParser statements inp of
         Left x -> x
-        Right s -> transpile "d" s
+        Right s -> transpile "d" "h" s
 
-transpile :: String -> Statement -> String
-transpile deckName = \case
 header :: String
 header =
     intercalate
@@ -31,6 +29,13 @@ header =
         , "\treturn card in hand"
         ]
         <> "\n"
+
+transpile :: String -> String -> [Statement] -> String
+transpile deckName handName =
+    (header <>) . intercalate "\n" . fmap (transpileLine deckName handName)
+
+transpileLine :: String -> String -> Statement -> String
+transpileLine deckName handName = \case
     SetDeck xs ->
         let transpiledDeck = intercalate "," ((\(c, n) -> c <> ":" <> show n) <$> xs)
          in concat [deckName, " = ", "{" <> transpiledDeck <> "}"]
