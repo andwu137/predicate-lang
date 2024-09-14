@@ -8,10 +8,6 @@ module Predicate.Parser (
     statement,
     expr,
     apply,
-    identifier,
-    surroundHSpace,
-    bracket,
-    bracketable,
 ) where
 
 import Control.Monad
@@ -22,6 +18,7 @@ import qualified Data.Text as T
 import Data.Void
 import qualified Text.Megaparsec as MP
 import qualified Text.Megaparsec.Char as MP
+import qualified Text.Megaparsec.Debug as MP
 import Text.Parser.Combinators
 
 {- Parser -}
@@ -33,13 +30,20 @@ testParser p test = do
         Left bundle -> Left $ MP.errorBundlePretty bundle
         Right s -> Right s
 
+{- Constants -}
+maxTerm :: Int
+maxTerm = 2
+
+deckIdentifier :: String
+deckIdentifier = "deck"
+
 {- Data Types -}
 type Identifier = String
 type CardId = String
 type Deck = [(CardId, Integer)]
 
 data Statement
-    = Assign Identifier Expr
+    = Assign Identifier [Identifier] Expr
     | SetDeck Deck
     deriving (Show, Eq)
 
@@ -51,27 +55,30 @@ data Expr
     | Or Expr Expr
     | And Expr Expr
     | Implies Expr Expr
-    | Apply Identifier [Expr]
+    | Apply Expr [Expr]
     deriving (Show, Eq)
 
 data Dir2D = Backwards | Forwards
     deriving (Show, Eq)
 
 {- Parse Functions -}
-maxTerm :: Int
-maxTerm = 2
-
 bracket :: Parser a -> Parser a
 bracket p = MP.char '(' *> p <* MP.char ')'
 
 bracketable :: Parser a -> Parser a
 bracketable p = bracket p <|> p
 
+bracketHSpaceable :: Parser a -> Parser a
+bracketHSpaceable p = bracket (surroundHSpace p) <|> p
+
 surroundHSpace :: Parser a -> Parser a
 surroundHSpace = MP.try . surround MP.hspace
 
 statements :: Parser [Statement]
 statements = many (surround MP.space statement) <* MP.eof
+
+nextLine :: Parser ()
+nextLine = MP.hspace *> MP.newline *> MP.space
 
 -- >>> testParser statement "function = x | y & z;"
 -- >>> testParser statement "function = do\nx | y & z\na & b & c\n;"
@@ -80,13 +87,22 @@ statements = many (surround MP.space statement) <* MP.eof
 statement :: Parser Statement
 statement = do
     n <- identifier
-    void $ surround MP.space $ MP.char '='
-    case n of
-        "deck" -> SetDeck <$> deck
-        _ -> do
+    if n == deckIdentifier
+        then do
+            equalSign
+            SetDeck <$> deck
+        else do
+            ps <- MP.hspace *> params
+            equalSign
             e <- doNotation <|> expr
             MP.space <* MP.char ';'
-            pure $ Assign n e
+            pure $ Assign n ps e
+
+params :: Parser [String]
+params = identifier `sepEndBy` MP.hspace
+
+equalSign :: Parser ()
+equalSign = void $ surround MP.space $ MP.char '='
 
 deck :: Parser Deck
 deck = do
@@ -107,14 +123,17 @@ tuple px py = do
 doNotation :: Parser Expr
 doNotation = do
     MP.string "do" *> MP.space1
-    fmap (foldl1 And) (sepBy1 expr MP.space1)
+    fmap (foldl1 And) (expr `sepBy1` nextLine)
 
 -- >>> testParser identifier "function"
 -- >>> testParser identifier "!function"
 -- Right "function"
 -- Left "source-file:1:1:\n  |\n1 | !function\n  | ^\nunexpected '!'\nexpecting letter\n"
 identifier :: Parser Identifier
-identifier = MP.letterChar <:> many MP.alphaNumChar
+identifier =
+    MP.letterChar <:> many (MP.alphaNumChar <|> MP.oneOf special)
+  where
+    special = "_'" :: String
 
 -- >>> testParser expr "e1"
 -- >>> testParser expr "e1 | e2 & e3"
@@ -133,11 +152,12 @@ identifier = MP.letterChar <:> many MP.alphaNumChar
 -- Right (Implies (Or (Ident "e1") (Ident "e2")) (And (Ident "e3") (Not (Ident "e4"))))
 -- Right (Implies (Ident "e1") (Implies (Ident "e2") (Ident "e3")))
 expr :: Parser Expr
-expr = term >>= expr' maxTerm
+expr =
+    surroundHSpace term >>= expr' maxTerm
   where
     expr' n l =
         ( do
-            (m, dir, o) <- choice $ binOps n
+            (m, dir, o) <- surroundHSpace $ binOps n
             case dir of
                 Forwards ->
                     o l <$> (term >>= expr' m)
@@ -149,33 +169,44 @@ expr = term >>= expr' maxTerm
                 then pure l
                 else expr' (n + 1) l
 
-    term =
-        (surroundHSpace unOps >>= (<$> term))
-            <|> surroundHSpace
-                ( choice
-                    [ bracket expr
-                    , bracketable exprIdent
-                    , bracketable apply
-                    ]
-                )
+term :: Parser Expr
+term =
+    ((unOps <* MP.hspace) >>= (<$> term))
+        <|> choice
+            [ bracket expr
+            , exprIdent
+            , bracketable apply
+            ]
 
-    unOps = choice [exprNot]
-    binOps n =
-        concat
-            . zipWith (\i -> fmap (\(d, e) -> (i,d,) <$> e)) [0 ..]
-            . take n
-            $ [ [(Forwards, exprImpl)]
-              ,
-                  [ (Backwards, exprOr)
-                  , (Backwards, exprAnd)
-                  ]
+{- Nullary Expr -}
+exprIdent :: Parser Expr
+exprIdent = bracketHSpaceable $ Ident <$> identifier
+
+{- Unary Expr -}
+unOps :: Parser (Expr -> Expr)
+unOps = choice [exprNot]
+
+exprNot :: Parser (Expr -> Expr)
+exprNot = MP.char '~' $> Not
+
+{- Binary Expr -}
+binOps :: Int -> Parser (Int, Dir2D, Expr -> Expr -> Expr)
+binOps n =
+    choice
+        . concat
+        . zipWith (\i -> fmap (\(d, e) -> (i,d,) <$> e)) [0 ..]
+        . take n
+        $ [ [(Forwards, exprImpl)]
+          ,
+              [ (Backwards, exprOr)
+              , (Backwards, exprAnd)
               ]
+          ]
 
-    exprNot = MP.char '~' $> Not
-    exprIdent = bracketable $ Ident <$> surroundHSpace identifier
-    exprOr = MP.char '|' $> Or
-    exprAnd = MP.char '&' $> And
-    exprImpl = MP.string "->" $> Implies
+exprOr, exprAnd, exprImpl :: Parser (Expr -> Expr -> Expr)
+exprOr = MP.char '|' $> Or
+exprAnd = MP.char '&' $> And
+exprImpl = MP.string "->" $> Implies
 
 -- >>> testParser apply "{a #2 #1 2}"
 -- >>> testParser apply "{a ({has 2} | {give 3})}"
@@ -184,16 +215,21 @@ expr = term >>= expr' maxTerm
 -- Right (Apply "a" [Or (Apply "has" [Ident "2"]) (Apply "give" [Ident "3"])])
 -- Left "source-file:1:3:\n  |\n1 | {a}\n  |   ^\nunexpected '}'\nexpecting '#', '(', alphanumeric character, digit, or white space\n"
 apply :: Parser Expr
-apply = surroundHSpace $ do
+apply = do
     MP.char '{' *> MP.hspace
-    i <- identifier
+    i <- term
     MP.space
-    a <- sepBy1 arg MP.hspace1
+    a <- arg `sepBy` MP.hspace1
     MP.space <* MP.char '}'
     pure $ Apply i a
 
 arg :: Parser Expr
-arg = (Card <$> card) <|> (Num <$> num) <|> bracket expr
+arg =
+    choice
+        [ Card <$> card
+        , Num <$> num
+        , term
+        ]
 
 num :: (Read a) => Parser a
 num = read <$> some MP.digitChar

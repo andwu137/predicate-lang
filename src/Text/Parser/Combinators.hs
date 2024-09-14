@@ -21,7 +21,8 @@ chainl1 :: (Monad m, Alternative m) => m a -> m (a -> a -> a) -> m a
 chainl1 p = chainl p p
 
 chainl :: (Monad m, Alternative m) => m a -> m a -> m (a -> a -> a) -> m a
-chainl p1 p o = p1 >>= rest
+chainl p1 p o =
+    p1 >>= rest
   where
     rest l =
         (($ l) <$> o <*> p >>= rest)
@@ -31,7 +32,8 @@ chainr1 :: (Monad m, Alternative m) => m a -> m (a -> a -> a) -> m a
 chainr1 p = chainr p p
 
 chainr :: (Monad m, Alternative m) => m a -> m a -> m (a -> a -> a) -> m a
-chainr p1 p o = p1 >>= rest
+chainr p1 p o =
+    p1 >>= rest
   where
     rest l =
         (($ l) <$> o <*> (p >>= rest))

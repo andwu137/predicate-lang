@@ -27,6 +27,8 @@ header =
         , "\treturn hand.count(card) > n"
         , "def has(hand, card):"
         , "\treturn card in hand"
+        , "def if_(hand, b, f, g):"
+        , "\treturn f if b else g"
         ]
         <> "\n"
 
@@ -39,23 +41,32 @@ transpileLine deckName handName = \case
     SetDeck xs ->
         let transpiledDeck = intercalate "," ((\(c, n) -> c <> ":" <> show n) <$> xs)
          in concat [deckName, " = ", "{" <> transpiledDeck <> "}"]
-    Assign f e ->
+    Assign f xs e ->
         concat
             [ "def " <> f
-            , "(" <> handName <> "):\n\treturn"
+            , "("
+            , intercalate "," (handName : xs)
+            , "):\n\treturn "
             , transpileExpr handName e
             ]
 
 transpileExpr :: String -> Expr -> String
-transpileExpr handName = go
+transpileExpr handName =
+    go
   where
+    wrap x = "(" : x <> [")"]
     go =
         concat . \case
             Card c -> [c]
-            Ident i -> [i, "(", handName, ")"]
+            Ident i -> [i]
             Num n -> [show n]
-            Not e -> ["(not ", go e, ")"]
-            Or l r -> ["(", go l, " or ", go r, ")"]
-            And l r -> ["(", go l, " and ", go r, ")"]
-            Implies l r -> ["(", go (Not l), " or ", go r, ")"]
-            Apply f xs -> [f, "(", handName, ",", intercalate "," $ go <$> xs, ")"]
+            Not e -> wrap ["not ", go e, ""]
+            Or l r -> wrap [go l, " or ", go r]
+            And l r -> wrap [go l, " and ", go r]
+            Implies l r -> wrap ["(", go (Not l), " or ", go r, ")"]
+            Apply f xs ->
+                [ transpileExpr handName f
+                , "("
+                , intercalate "," (handName : (go <$> xs))
+                , ")"
+                ]
