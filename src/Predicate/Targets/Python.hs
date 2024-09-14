@@ -40,18 +40,22 @@ transpileLine deckName handName = \case
         let transpiledDeck = intercalate "," ((\(c, n) -> c <> ":" <> show n) <$> xs)
          in concat [deckName, " = ", "{" <> transpiledDeck <> "}"]
     Assign f e ->
-        concat ["def ", f, "(", deckName, "):\n\treturn", transpileExpr deckName e]
+        concat
+            [ "def " <> f
+            , "(" <> handName <> "):\n\treturn"
+            , transpileExpr handName e
+            ]
 
 transpileExpr :: String -> Expr -> String
-transpileExpr deckName = go
+transpileExpr handName = go
   where
     go =
         concat . \case
-            Card c -> [deckName, "[", c, "]"]
-            Ident i -> [i, "(", deckName, ")"]
+            Card c -> [c]
+            Ident i -> [i, "(", handName, ")"]
             Num n -> [show n]
             Not e -> ["(not ", go e, ")"]
             Or l r -> ["(", go l, " or ", go r, ")"]
             And l r -> ["(", go l, " and ", go r, ")"]
-            Implies l r -> ["(", go l, " and ", go r, ")"]
-            Apply f xs -> [f, "(", intercalate "," $ go <$> xs, ")"]
+            Implies l r -> ["(", go (Not l), " or ", go r, ")"]
+            Apply f xs -> [f, "(", handName, ",", intercalate "," $ go <$> xs, ")"]
