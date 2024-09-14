@@ -39,6 +39,8 @@ library:
   source-dirs: src
   default-extensions:
     OverloadedStrings
+    , TupleSections
+    , LambdaCase
 
 executables:
   predicate-lang-exe:
